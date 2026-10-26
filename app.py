@@ -39,4 +39,4 @@ html = re.sub(
     html,
 )
 
-st.iframe(html, height=5000, scrolling=True, tab_index=0)
+st.iframe(html, height=5000)
