@@ -1,5 +1,7 @@
 from pathlib import Path
 import re
+import base64
+import mimetypes
 import streamlit as st
 
 st.set_page_config(
@@ -9,7 +11,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Rapikan tampilan Streamlit agar website tampil seperti situs mandiri.
 st.markdown(
     """<style>
     #MainMenu, footer, header {visibility: hidden;}
@@ -21,20 +22,29 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Muat HTML, CSS, dan JavaScript ke dalam satu iframe. Ini menghindari
-# masalah MIME type ketika index.html diminta langsung dari folder static.
 base = Path(__file__).parent
-html_path = base / "static" / "index.html"
-css_path = base / "static" / "style.css"
-js_path = base / "static" / "script.js"
-
-html = html_path.read_text(encoding="utf-8")
-css = css_path.read_text(encoding="utf-8")
-js = js_path.read_text(encoding="utf-8")
+static_dir = base / "static"
+html = (static_dir / "index.html").read_text(encoding="utf-8")
+css = (static_dir / "style.css").read_text(encoding="utf-8")
+js = (static_dir / "script.js").read_text(encoding="utf-8")
 html = html.replace('<link rel="stylesheet" href="style.css">', '<style>\n' + css + '\n</style>')
 html = html.replace('<script src="script.js" defer></script>', '<script>\n' + js + '\n</script>')
+
+# Embed profile photos directly in the HTML so they load reliably inside the iframe.
+def embed_image(match):
+    filename = match.group(2)
+    path = static_dir / filename
+    if not path.is_file():
+        return match.group(0)
+    mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f'{match.group(1)}="data:{mime};base64,{encoded}"'
+
+html = re.sub(r'(src)=["\'](foto/[^"\']+)["\']', embed_image, html)
+
+# Keep certificate links available through Streamlit static serving.
 html = re.sub(
-    r'(?P<attr>src|href)=["\'](foto/[^"\']+|sertifikat/[^"\']+)["\']',
+    r'(?P<attr>href)=["\'](sertifikat/[^"\']+)["\']',
     lambda m: f'{m.group("attr")}="/app/static/{m.group(2)}"',
     html,
 )
